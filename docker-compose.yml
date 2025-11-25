@@ -20,7 +20,7 @@ services:
 
   auth-service:
     build:
-      context: ./auth-service/auth-service
+      context: ./auth-service
       dockerfile: Dockerfile
     container_name: auth-service
     depends_on:
@@ -38,5 +38,45 @@ services:
     ports:
       - "3000:3000"
 
+  payment-db:
+    image: postgres:16-alpine
+    container_name: payment-db
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_pass
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U payment_user -d payment_db']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    environment:
+      PORT: 4000
+      DB_HOST: payment-db
+      DB_PORT: 5432
+      DB_USERNAME: payment_user
+      DB_PASSWORD: payment_pass
+      DB_NAME: payment_db
+      AUTH_SERVICE_URL: http://auth-service:3000
+      TOKEN_CACHE_TTL_MS: 60000
+    ports:
+      - '4000:4000'
+
 volumes:
   auth-db-data:
+  payment-db-data:
