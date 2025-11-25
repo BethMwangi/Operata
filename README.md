@@ -26,7 +26,7 @@ cd <Operata>
 
 ```bash
 docker compose up --build
-```
+
 
 
 This will start:
