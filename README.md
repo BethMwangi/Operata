@@ -11,7 +11,7 @@ This project implements two backend services using **NestJS**:
 
 Both services are fully **dockerized**, run independently, and use **separate PostgreSQL databases**.
 
----
+
 
 # How to Run the Project
 
@@ -27,64 +27,62 @@ cd <Operata>
 ```bash
 docker compose up --build
 
+```
 
+- ## ** This will start:
 
-This will start:
+1. auth-service on ``` http://localhost:3000 ```
 
-auth-service on http://localhost:3000
+2. payment-service on ``` http://localhost:4000```
 
-payment-service on http://localhost:4000
+3. auth-db (PostgreSQL)
 
-auth-db (PostgreSQL)
+4. payment-db (PostgreSQL)
 
-payment-db (PostgreSQL)
-
-API Documentation (Swagger)
+5. API Documentation (Swagger)
 
 Once the services are running:
 
-Auth Service Docs
+#### Auth Service Docs
 
- http://localhost:3000/docs
+ ```http://localhost:3000/docs```
+`
+### Payment Service Docs
 
-Payment Service Docs
-
- http://localhost:4000/docs
-
-Swagger provides all request/response formats and testing UI.
+ ``` http://localhost:4000/docs```
 
 
-Auth Service Endpoints
-POST /api/auth/register
 
-Register a new user (phone, email, password).
+###  Auth Service Endpoints
+``` POST /api/auth/register```
 
-POST /api/auth/login
+###  Register a new user (phone, email, password).
 
-Login using phone + password.
+```POST /api/auth/login```
+
+###  Login using phone + password.
 Returns a JWT access token.
+``` GET /api/auth/validate```
 
-GET /api/auth/validate
 
 Validate a JWT token (used internally by payment-service).
 
-
-Payment Service Endpoints
+## **Payment Service Endpoints
 
 All endpoints require Authorization: Bearer <token>
 (Use the token returned from POST /auth/login)
 
-POST /api/payments
+``` POST /api/payments```
 
-Create a payment (starts in INITIATED state).
+###  Create a payment (starts in INITIATED state).
 
-GET /api/payments/{reference}
+```GET /api/payments/{reference}```
 
-Fetch payment details by payment reference.
+###  Fetch payment details by payment reference.
+``` POST /api/payments/{reference}/status ```
 
-POST /api/payments/{reference}/status
 
-Update payment status.
+###  Update payment status.
 Valid transitions:
 
 INITIATED → PENDING
@@ -95,42 +93,21 @@ PENDING → FAILED
 
 Invalid transitions return 400 Bad Request.
 
-POST /api/payments/webhook/provider
+```POST /api/payments/webhook/provider```
 
-Simulates a provider webhook.
+###  Simulates a provider webhook.
 Includes idempotency handling by tracking webhookId.
 
-Tools & Technologies Used
-Backend Framework
+###  Tools & Technologies Used
 
 NestJS (TypeScript)
-
-Databases
-
 PostgreSQL (separate DB for each service)
-
-Auth
-
 JWT
-
 bcrypt password hashing
-
-Documentation
-
 Swagger (OpenAPI 3)
-
-Containerization
-
 Docker
-
 Docker Compose
-
-Other
-
 TypeORM ORM
-
 class-validator for DTO validation
-
 Axios HTTP client for service-to-service authentication
-
 In-memory token cache in payment-service
