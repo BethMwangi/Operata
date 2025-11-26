@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { HealthController } from './health/health.controller';
 
 import { PaymentModule } from './payments/payment.module';
 import { Payment } from './payments/payment.entity';
@@ -28,5 +29,6 @@ import { Payment } from './payments/payment.entity';
 
     PaymentModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

@@ -49,7 +49,7 @@ export class AuthClientService {
     }
 
     const baseUrl =
-      this.config.get<string>('AUTH_SERVICE_URL') || 'http://auth-service:3000';
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://auth-service:3002';
 
     try {
       const response = await firstValueFrom(

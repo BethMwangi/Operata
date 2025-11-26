@@ -1,6 +1,51 @@
 version: '3.9'
 
+x-auth-service-base: &auth-service-base
+  build:
+    context: ./auth-service
+    dockerfile: Dockerfile
+  environment:
+    PORT: 3002
+    DB_HOST: auth-db
+    DB_PORT: 5432
+    DB_USERNAME: auth_user
+    DB_PASSWORD: auth_pass
+    DB_NAME: auth_db
+    JWT_SECRET: super-secret-jwt
+    JWT_EXPIRES_IN: "3600"
+  depends_on:
+    auth-db:
+      condition: service_healthy
+  restart: always
+
+x-payment-service-base: &payment-service-base
+  build:
+    context: ./payment-service
+    dockerfile: Dockerfile
+  environment:
+    PORT: 4000
+    DB_HOST: payment-db
+    DB_PORT: 5432
+    DB_USERNAME: payment_user
+    DB_PASSWORD: payment_pass
+    DB_NAME: payment_db
+    AUTH_SERVICE_URL: http://auth-service-1:3002
+    TOKEN_CACHE_TTL_MS: 60000
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+  depends_on:
+    payment-db:
+      condition: service_healthy
+    auth-service-1:
+      condition: service_started
+    redis:
+      condition: service_started
+  restart: always
+
 services:
+  # -------------------------
+  # Databases
+  # -------------------------
   auth-db:
     image: postgres:16-alpine
     container_name: auth-db
@@ -17,26 +62,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
-  auth-service:
-    build:
-      context: ./auth-service
-      dockerfile: Dockerfile
-    container_name: auth-service
-    depends_on:
-      auth-db:
-        condition: service_healthy
-    environment:
-      PORT: 3000
-      DB_HOST: auth-db
-      DB_PORT: 5432
-      DB_USERNAME: auth_user
-      DB_PASSWORD: auth_pass
-      DB_NAME: auth_db
-      JWT_SECRET: super-secret-jwt
-      JWT_EXPIRES_IN: "3600"
-    ports:
-      - "3000:3000"
+    restart: always
 
   payment-db:
     image: postgres:16-alpine
@@ -48,35 +74,94 @@ services:
     volumes:
       - payment-db-data:/var/lib/postgresql/data
     ports:
-      - '5433:5432'
+      - "5433:5432"  
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U payment_user -d payment_db']
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: always
 
-  payment-service:
-    build:
-      context: ./payment-service
-      dockerfile: Dockerfile
-    container_name: payment-service
-    depends_on:
-      payment-db:
-        condition: service_healthy
-      auth-service:
-        condition: service_started
-    environment:
-      PORT: 4000
-      DB_HOST: payment-db
-      DB_PORT: 5432
-      DB_USERNAME: payment_user
-      DB_PASSWORD: payment_pass
-      DB_NAME: payment_db
-      AUTH_SERVICE_URL: http://auth-service:3000
-      TOKEN_CACHE_TTL_MS: 60000
+  # -------------------------
+  # Auth Service
+  # -------------------------
+  auth-service-1:
+    <<: *auth-service-base
+    container_name: auth-service-1
     ports:
-      - '4000:4000'
+      - "3002:3002"
+    healthcheck:
+    test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
 
+  auth-service-2:
+    <<: *auth-service-base
+    container_name: auth-service-2
+    healthcheck:
+    test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
+
+  # -------------------------
+  # Payment Service (2 instances)
+  # -------------------------
+  payment-service-1:
+    <<: *payment-service-base
+    container_name: payment-service-1
+    ports:
+      - "4000:4000"
+    healthcheck:
+    test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
+
+  payment-service-2:
+    <<: *payment-service-base
+    container_name: payment-service-2
+    healthcheck:
+    test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 10s
+
+  # -------------------------
+  # Nginx Reverse Proxy 
+  # -------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: api-gateway
+    depends_on:
+      - auth-service-1
+      - auth-service-2
+      - payment-service-1
+      - payment-service-2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/sites:/etc/nginx/conf.d:ro
+      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
+    restart: always
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]  # AOF persistence
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"  
+    restart: always
+    
 volumes:
   auth-db-data:
   payment-db-data:
+  redis-data:

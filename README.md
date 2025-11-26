@@ -31,7 +31,7 @@ docker compose up --build
 
 - ## ** This will start:
 
-1. auth-service on ``` http://localhost:3000 ```
+1. auth-service on ``` http://localhost:3002 ```
 
 2. payment-service on ``` http://localhost:4000```
 
@@ -45,7 +45,7 @@ Once the services are running:
 
 #### Auth Service Docs
 
- ```http://localhost:3000/docs```
+ ```http://localhost:3002/docs```
 `
 ### Payment Service Docs
 
