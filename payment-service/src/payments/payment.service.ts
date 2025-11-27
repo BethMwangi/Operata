@@ -13,6 +13,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentStatusDto } from './dto/update-status.dto';
 import { WebhookDto } from './dto/webhook.dto';
 import { PaymentStatus } from './payment.enum';
+import { MetricsService } from 'src/metrics/metrics.service';
 
 @Injectable()
 export class PaymentService {
@@ -21,6 +22,7 @@ export class PaymentService {
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepo: Repository<Payment>,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async createPayment(dto: CreatePaymentDto): Promise<Payment> {
@@ -38,6 +40,7 @@ export class PaymentService {
     });
 
     await this.paymentRepo.save(payment);
+    this.metricsService.recordPaymentInitiated();
     this.logger.log(`Created payment ${reference} with status INITIATED`);
 
     return payment;
@@ -66,6 +69,21 @@ export class PaymentService {
       `Invalid status transition: ${from} -> ${to}`,
     );
   }
+  private recordStatusMetric(status: PaymentStatus): void {
+    switch (status) {
+      case PaymentStatus.PENDING:
+        this.metricsService.recordPaymentPending();
+        break;
+      case PaymentStatus.SUCCESS:
+        this.metricsService.recordPaymentSuccess();
+        break;
+      case PaymentStatus.FAILED:
+        this.metricsService.recordPaymentFailure();
+        break;
+      default:
+        break;
+    }
+  }
 
   async updateStatus(
     reference: string,
@@ -81,6 +99,7 @@ export class PaymentService {
     }
 
     await this.paymentRepo.save(payment);
+    this.recordStatusMetric(dto.status);
     this.logger.log(
       `Updated payment ${reference} status to ${dto.status} via manual status endpoint`,
     );
@@ -107,6 +126,7 @@ export class PaymentService {
     payment.lastWebhookAt = new Date(dto.timestamp);
 
     await this.paymentRepo.save(payment);
+    this.recordStatusMetric(dto.status);
     this.logger.log(
       `Processed webhook for payment ${dto.reference}, new status ${dto.status}`,
     );

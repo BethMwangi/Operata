@@ -5,7 +5,7 @@ import { User } from './users/user.entity';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health/health.controller';
-
+import { MetricsModule } from './metrics/metrics.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -29,6 +29,7 @@ import { HealthController } from './health/health.controller';
 
     UsersModule,
     AuthModule,
+    MetricsModule,
   ],
   controllers: [HealthController],
 })

@@ -7,10 +7,11 @@ import { PaymentController } from './payment.contoller';
 import { HttpModule } from '@nestjs/axios';
 import { AuthClientService } from '../auth/auth.service';
 import { AuthGuard } from '../auth/auth.guard';
-
+import { MetricsModule } from 'src/metrics/metrics.module';
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment]), HttpModule],
+  imports: [TypeOrmModule.forFeature([Payment]), HttpModule, MetricsModule],
   controllers: [PaymentController],
   providers: [PaymentService, AuthClientService, AuthGuard],
+  exports: [PaymentService],
 })
 export class PaymentModule {}

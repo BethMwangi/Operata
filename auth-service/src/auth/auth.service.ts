@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { MetricsService } from '../metrics/metrics.service';
 
 import { User } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -16,8 +17,10 @@ import { JwtPayload } from '../types/user';
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User) private readonly usersRepo: Repository<User>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -38,6 +41,7 @@ export class AuthService {
     });
 
     await this.usersRepo.save(user);
+    this.metricsService.recordRegister();
 
     return { id: user.id, phone: user.phone, email: user.email };
   }
@@ -45,11 +49,13 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.usersRepo.findOne({ where: { phone: dto.phone } });
     if (!user) {
+      this.metricsService.recordLoginFailure();
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
+      this.metricsService.recordLoginFailure();
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -64,6 +70,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       return payload;
     } catch {
+      this.metricsService.recordLoginFailure();
       throw new UnauthorizedException('Invalid token');
     }
   }

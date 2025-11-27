@@ -1,0 +1,165 @@
+- hosts: app_servers
+  become: yes
+  vars:
+    docker_users:
+      - deploy
+    node_exporter_version: "1.8.2"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install base packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - ufw
+          - wget
+        state: present
+
+    # --- Docker install ---
+    - name: Add Docker GPG key
+      shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+          gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker repo
+      copy:
+        dest: /etc/apt/sources.list.d/docker.list
+        content: |
+          deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+
+    - name: Install Docker and Compose plugin
+      apt:
+        update_cache: yes
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    # --- System user for deployments ---
+    - name: Create deploy user
+      user:
+        name: deploy
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Add deploy to docker group
+      user:
+        name: deploy
+        groups: docker
+        append: yes
+
+
+    # --- Firewall ---
+    - name: Set default UFW policies
+      ufw:
+        state: enabled
+        policy: "{{ item.policy }}"
+        direction: "{{ item.direction }}"
+      loop:
+        - { policy: deny, direction: incoming }
+        - { policy: allow, direction: outgoing }
+
+    - name: Allow SSH, HTTP, HTTPS
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - "22"
+        - "80"
+        - "443"
+
+    - name: Deny external access to PostgreSQL
+      ufw:
+        rule: deny
+        port: "5432"
+        proto: tcp
+
+    - name: Deny external access to Redis
+      ufw:
+        rule: deny
+        port: "6379"
+        proto: tcp
+
+    # --- SSH  ---
+    - name: SSH hardening - disable root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: Restart ssh
+
+    - name: SSH hardening - disable password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: Restart ssh
+
+    # --- Monitoring agent (node_exporter) ---
+    - name: Create node_exporter user
+      user:
+        name: node_exporter
+        shell: /usr/sbin/nologin
+        system: yes
+        create_home: no
+
+    - name: Download node_exporter
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+        mode: '0644'
+
+    - name: Extract node_exporter
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /opt
+        remote_src: yes
+        creates: "/opt/node_exporter-{{ node_exporter_version }}.linux-amd64"
+
+    - name: Symlink node_exporter binary
+      file:
+        src: "/opt/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        state: link
+
+    - name: Create systemd unit for node_exporter
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Prometheus Node Exporter
+          After=network.target
+
+          [Service]
+          User=node_exporter
+          Group=node_exporter
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd and enable node_exporter
+      systemd:
+        daemon_reload: yes
+        name: node_exporter
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Restart ssh
+      service:
+        name: ssh
+        state: restarted
+
+# ansible-playbook -i hosts.ini infra/ansible/site.yml

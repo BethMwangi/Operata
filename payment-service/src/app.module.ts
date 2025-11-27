@@ -5,6 +5,7 @@ import { HealthController } from './health/health.controller';
 
 import { PaymentModule } from './payments/payment.module';
 import { Payment } from './payments/payment.entity';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { Payment } from './payments/payment.entity';
     }),
 
     PaymentModule,
+    MetricsModule,
   ],
   controllers: [HealthController],
 })

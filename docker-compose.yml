@@ -91,21 +91,21 @@ services:
     ports:
       - "3002:3002"
     healthcheck:
-    test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   auth-service-2:
     <<: *auth-service-base
     container_name: auth-service-2
     healthcheck:
-    test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:3002/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   # -------------------------
   # Payment Service (2 instances)
@@ -116,21 +116,21 @@ services:
     ports:
       - "4000:4000"
     healthcheck:
-    test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   payment-service-2:
     <<: *payment-service-base
     container_name: payment-service-2
     healthcheck:
-    test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   # -------------------------
   # Nginx Reverse Proxy 
@@ -159,6 +159,63 @@ services:
       - redis-data:/data
     ports:
       - "6379:6379"  
+    restart: always
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    container_name: nginx-exporter
+    command:
+      - "-nginx.scrape-uri=http://nginx:80/stub_status"
+    depends_on:
+      - nginx
+    ports:
+      - "9113:9113"
+    restart: always
+
+  # Postgres exporter (for both DBs)
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    container_name: postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://auth_user:auth_pass@auth-db:5432/auth_db?sslmode=disable"
+    depends_on:
+      - auth-db
+    ports:
+      - "9187:9187"
+    restart: always
+
+  # Redis exporter
+  redis-exporter:
+    image: oliver006/redis_exporter
+    container_name: redis-exporter
+    command:
+      - "--redis.addr=redis:6379"
+    depends_on:
+      - redis
+    ports:
+      - "9121:9121"
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"
     restart: always
     
 volumes:

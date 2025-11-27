@@ -5,12 +5,12 @@ import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'metrics  '],
+  });
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 3000;
-
-  app.setGlobalPrefix('api');
-
+  const port = configService.get<number>('PORT') || 3002;
   const config = new DocumentBuilder()
     .setTitle('Auth Service')
     .setDescription('Authentication service API')

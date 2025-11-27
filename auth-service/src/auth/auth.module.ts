@@ -6,10 +6,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { User } from '../users/user.entity';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
+    MetricsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService): JwtModuleOptions => {

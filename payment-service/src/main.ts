@@ -7,10 +7,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const rawPort = configService.get('PORT');
+  const rawPort = configService.get<string>('PORT');
   const port = rawPort ? Number(rawPort) : 4000;
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'metrics'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Payment Service')
