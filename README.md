@@ -1,4 +1,13 @@
 # Payment Platform Microservices (Auth + Payments)
+## The Architecture link 
+```bash
+[Architecure](https://excalidraw.com/#room=57ada7e12651cfed61e0,J47ymRn52iSSVLz1A8gslA)
+```
+Loom Video 
+```bash
+
+```
+
 
 This project implements two backend services using **NestJS**:
 
